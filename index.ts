@@ -4,11 +4,11 @@ const SCREEN_WIDTH = 300;
 const PLAYER_STEP_LEN = 0.5;
 const FAR_CLIPPING_PLANE = 10.0;
 const PLAYER_SPEED = 1;
-
+const PLAYER_SIZE = 0.5;
 class Color {
   r: number;
   g: number;
-  b: number;
+  b: number; 
   a: number;
   constructor(r: number, g: number, b: number, a: number) {
     this.r = r;
@@ -67,6 +67,10 @@ class Vector2 {
   }
   static zero(): Vector2 {
     return new Vector2(0, 0);
+  }
+
+  static scaler(value : number) :Vector2 {
+    return new Vector2(value, value)
   }
 
   div(that: Vector2): Vector2 {
@@ -182,6 +186,9 @@ function rayStep(p1: Vector2, p2: Vector2): Vector2 {
 }
 type Cell = Color | HTMLImageElement | null;
 
+
+/// ========================= Scene ============================================
+
 class Scene {
   cells : Array<Cell>
   width : number;
@@ -212,6 +219,10 @@ class Scene {
     if(!this.contains(p) ) return undefined; 
     const fp = p.map(Math.floor);
     return this.cells[fp.y*this.width +fp.x]
+  }
+  isWall(p:Vector2) :boolean {
+    const c = this.getCell(p);
+    return c !== null && c!== undefined 
   }
 }
 
@@ -270,9 +281,8 @@ function renderMinimap(
   }
 
   ctx.fillStyle = "magenta";
-
-  fillCircle(ctx, player.position, 0.2);
-
+  // fillCircle(ctx, player.position, 0.2);
+  ctx.fillRect( player.position.x -PLAYER_SIZE*0.5, player.position.y -PLAYER_SIZE*0.5 ,PLAYER_SIZE, PLAYER_SIZE)
   const [p1, p2] = player.fovRange();
 
   ctx.strokeStyle = "white";
@@ -375,8 +385,10 @@ function renderGame(
   const cellSize = ctx.canvas.width * 0.03;
   const miniMapSize = scene.size().scale(cellSize);
 
-  ctx.fillStyle = "#181818";
+  ctx.fillStyle = "#303030";
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.fillStyle = "#181818";
+  ctx.fillRect(0,ctx.canvas.height*0.5 , ctx.canvas.width , ctx.canvas.height*0.5);
   renderScene(ctx, player, scene);
   renderMinimap(ctx, player, miniMapPosition, miniMapSize, scene);
 }
@@ -392,6 +404,20 @@ async function loadImageData(url: string): Promise<HTMLImageElement> {
     image.onerror = reject;
   });
 }
+
+
+function canPlayerGoThere(scene: Scene , newPosition: Vector2) : boolean{
+  const corner = newPosition.sub(Vector2.scaler(PLAYER_SIZE *0.5))
+  for(let dx =0;dx<2;++dx){
+    for(let dy =0;dy<2;++dy){
+     if(scene.isWall( corner.add(new Vector2(dx, dy).scale(PLAYER_SIZE)))) {
+      return false;
+     }
+    }
+  }
+  return true
+}
+
 
 ( async() => {
   const game = document.getElementById("game") as HTMLCanvasElement;
@@ -508,9 +534,8 @@ async function loadImageData(url: string): Promise<HTMLImageElement> {
 
     player.direction = player.direction + angularVelocity * deltaTime;
     const newPosition = player.position.add(velocity.scale(deltaTime));
-    const newCellPosition = newPosition.map(Math.floor)
-     const cell =  scene.getCell(newPosition)
-    if(cell === null || cell === undefined){
+
+    if(canPlayerGoThere(scene, newPosition)){
       player.position = newPosition;
 
     }
